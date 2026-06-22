@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - test/cicd-pipeline
 
 env:
   AWS_REGION: eu-central-1
