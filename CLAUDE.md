@@ -4,19 +4,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-DevOps quiz platform (Docker, Kubernetes, Jenkins, AWS, Linux topics). Three-tier: React frontend → Flask API → PostgreSQL. Intended for deployment on EKS via Terraform.
+DevOps quiz platform (Docker, Kubernetes, Jenkins, AWS, Linux topics). Three-tier: React frontend → Flask API → PostgreSQL. Deployed on AWS EKS via Terraform. CI/CD via GitHub Actions.
 
 Note: the Terraform directory is named `terrafrom` (typo), not `terraform`.
 
-## Local Development
+## Collaboration Style
 
-**Full stack (recommended):**
-```bash
-docker compose up --build
-# frontend → http://localhost:3000
-# backend  → http://localhost:8000
-# postgres → localhost:5432
-```
+User writes all Terraform, K8s, and GitHub Actions code. Claude reviews only — points out bugs, missing resources, syntax errors. Do not rewrite user's code unprompted.
+
+## Project Source
+
+Based on: https://github.com/NotHarshhaa/DevOps-Projects/tree/master/DevOps-Project-36
+
+## CI/CD
+
+**GitHub Actions** (`.github/workflows/deploy.yaml`). Three jobs:
+1. `test` — Python pytest
+2. `build` — Docker build + push to ECR (tagged with `github.sha` and `latest`)
+3. `deploy` — kubectl apply (not yet written, pending K8s manifests)
+
+Required GitHub repository secrets:
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `ECR_FRONTEND` — full ECR URL e.g. `123.dkr.ecr.eu-central-1.amazonaws.com/k8s-ecr-repository-frontend`
+- `ECR_BACKEND` — full ECR URL e.g. `123.dkr.ecr.eu-central-1.amazonaws.com/k8s-ecr-repository-backend`
+
+## Local Development
 
 **Backend only (no Docker):**
 ```bash
@@ -24,7 +37,6 @@ cd backend
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 
-# Start a local Postgres
 docker run --name flask_postgres \
   -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=password \
   -e POSTGRES_DB=devops_learning -p 5432:5432 -d postgres
@@ -51,14 +63,10 @@ REACT_APP_API_URL=http://localhost:8000/api npm start
 ## Database Operations
 
 ```bash
-# After changing models:
 flask db migrate -m "Description"
 flask db upgrade
 
-# Seed initial topics + questions (Docker, Kubernetes, Jenkins):
 python seed_data.py
-
-# Bulk-load questions from CSV:
 python bulk_upload_questions.py questions-answers/kubernetes_questions.csv
 python bulk_upload_questions.py questions-answers/docker_questions.csv
 python bulk_upload_questions.py questions-answers/jenkins_questions.csv
@@ -70,21 +78,8 @@ CSV format: `topic_slug, question_text, option_1, option_2, option_3, option_4, 
 
 ```bash
 cd frontend
-npm test                    # watch mode
-npm test -- --watchAll=false  # single run
+npm test -- --watchAll=false
 ```
-
-## Collaboration Style
-
-User writes all Terraform, K8s, and Jenkins code themselves. Claude reviews only — points out bugs, missing resources, syntax errors. Do not rewrite user's code unprompted.
-
-## Project Source
-
-Based on: https://github.com/NotHarshhaa/DevOps-Projects/tree/master/DevOps-Project-36
-
-## CI/CD Decision
-
-**Jenkins** chosen. Pipeline: build Docker images → push to ECR → deploy to EKS.
 
 ## Terraform (Infrastructure)
 
@@ -97,30 +92,22 @@ terraform apply
 
 Region: `eu-central-1`.
 
-### Terraform Current State (as of 2026-06-22)
+### Modules (all complete)
 
-**Modules written:** `vpc`, `eks`, `iam`
+- **vpc** — VPC, 2 public + 2 private subnets, IGW, NAT gateway. Tagged for EKS LB controller.
+- **iam** — EKS cluster role (`AmazonEKSClusterPolicy`) + node group role (Worker, CNI, ECR policies). Three separate `aws_iam_role_policy_attachment` resources each.
+- **eks** — EKS 1.31 cluster, node group `t3.small` (1–3 nodes), security group. `depends_on = [module.iam, module.vpc]`.
+- **ecr** — Two repos: `k8s-ecr-repository-frontend`, `k8s-ecr-repository-backend`. Lifecycle policy: keep last 10 images.
 
-**`main.tf` status:** only `vpc` module wired up — `eks` and `iam` not called yet
+### Root outputs
 
-**Known bugs to fix:**
-1. `iam/main.tf`: `policy_arn` is a string field, not a list — three separate `aws_iam_role_policy_attachment` resources needed
-2. IAM role for EKS cluster control plane missing (only node group role exists)
-3. `main.tf`: `eks` and `iam` modules not connected
-4. `output.tf` and `varables.tf` in root are empty
-5. ECR module not written yet (needed for Jenkins pipeline)
-
-**Still to write:**
-- ECR module
-- Root `variables.tf` and `outputs.tf`
-- Wire all modules in `main.tf` (pass VPC outputs → EKS, IAM ARNs → EKS)
-- Optional: S3 + DynamoDB backend for remote state
+`cluster_endpoint`, `cluster_name`, `oidc_issuer_url`, `ecr_repository_url`
 
 ## Architecture
 
 ### Backend (`backend/`)
 
-Flask app factory pattern in `app/__init__.py`. Three blueprints registered:
+Flask app factory pattern in `app/__init__.py`. Three blueprints:
 
 | Blueprint | Prefix | File |
 |-----------|--------|------|
@@ -128,29 +115,34 @@ Flask app factory pattern in `app/__init__.py`. Three blueprints registered:
 | `quiz_bp` | `/api/quiz` | `routes/quiz_routes.py` |
 | `api_bp` | `/api` | `routes/__init__.py` (health check only) |
 
-**Data model quirks to know:**
-- `Topic.to_dict()` returns `slug` as the `id` field (not the integer PK). Frontend always uses slug, never numeric ID.
-- `Question.correct_answer` is a 0-based index into the `options` JSON array.
-- `Question.to_dict(shuffle=True)` (the default) randomizes option order and remaps `correct_answer` to the new index. Quiz GET endpoint uses shuffle; management endpoints use `shuffle=False`.
-- Quiz GET randomly samples up to `MAX_QUIZ_QUESTIONS = 15` from the full question pool per topic.
+**Data model quirks:**
+- `Topic.to_dict()` returns `slug` as `id` (not integer PK). Frontend always uses slug.
+- `Question.correct_answer` is 0-based index into `options` JSON array.
+- `Question.to_dict(shuffle=True)` (default) randomizes options and remaps `correct_answer`.
+- Quiz GET samples up to `MAX_QUIZ_QUESTIONS = 15` randomly per topic.
 
-**CORS:** If `ALLOWED_ORIGINS` env var is set, only those origins are allowed. Otherwise all origins pass. Set `ALLOWED_ORIGINS=http://your-frontend` in production.
+**CORS:** `ALLOWED_ORIGINS` env var controls allowed origins. Unset = all origins allowed.
 
 ### Frontend (`frontend/`)
 
 React + React Router v6 + Tailwind CSS. Three routes:
-- `/` → `Home` (topic list)
-- `/quiz/:topic` → `Quiz` (takes topic slug)
-- `/manage-questions` → `QuestionManager` (CRUD UI for questions)
+- `/` → `Home`
+- `/quiz/:topic` → `Quiz`
+- `/manage-questions` → `QuestionManager`
 
-API base URL comes from `REACT_APP_API_URL` env var (defaults to `http://localhost:8000/api`). All API calls go through `src/services/api.js` which imports from `src/config/api.js`.
+API base URL from `REACT_APP_API_URL` env var. All calls go through `src/services/api.js`.
+Production build served by nginx (`frontend/nginx.conf`).
 
-Production build is served by nginx (`frontend/nginx.conf`).
+Docker build context must be `./frontend` (not repo root) — `nginx.conf` is relative to service dir.
 
-### Terraform (`terrafrom/`)
+### K8s (`k8s/`) — not yet written
 
-VPC module (`modules/vpc/`) creates: VPC, 2 public subnets, 2 private subnets, IGW, NAT gateway (single, on public subnet 0), public and private route tables. Subnets are tagged for EKS load balancer controller (`kubernetes.io/role/elb`, `kubernetes.io/role/internal-elb`, `kubernetes.io/cluster/<name>`).
-
-### Docker
-
-`docker-compose.yml` wires all three services. Backend mounts `./backend:/app` for live reload in dev. `migrate.sh` is the migration entrypoint script used inside the container — it checks if the `topics` table is empty before running `seed_data.py`.
+Planned structure:
+```
+k8s/
+  namespace.yaml
+  backend/deployment.yaml, service.yaml
+  frontend/deployment.yaml, service.yaml
+  postgres/deployment.yaml, service.yaml, pvc.yaml
+  config/configmap.yaml, secret.yaml
+```
