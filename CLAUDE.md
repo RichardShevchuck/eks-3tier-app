@@ -74,6 +74,18 @@ npm test                    # watch mode
 npm test -- --watchAll=false  # single run
 ```
 
+## Collaboration Style
+
+User writes all Terraform, K8s, and Jenkins code themselves. Claude reviews only — points out bugs, missing resources, syntax errors. Do not rewrite user's code unprompted.
+
+## Project Source
+
+Based on: https://github.com/NotHarshhaa/DevOps-Projects/tree/master/DevOps-Project-36
+
+## CI/CD Decision
+
+**Jenkins** chosen. Pipeline: build Docker images → push to ECR → deploy to EKS.
+
 ## Terraform (Infrastructure)
 
 ```bash
@@ -83,7 +95,26 @@ terraform plan
 terraform apply
 ```
 
-Region hardcoded to `eu-central-1`. Only a VPC module exists; EKS resources not yet written.
+Region: `eu-central-1`.
+
+### Terraform Current State (as of 2026-06-22)
+
+**Modules written:** `vpc`, `eks`, `iam`
+
+**`main.tf` status:** only `vpc` module wired up — `eks` and `iam` not called yet
+
+**Known bugs to fix:**
+1. `iam/main.tf`: `policy_arn` is a string field, not a list — three separate `aws_iam_role_policy_attachment` resources needed
+2. IAM role for EKS cluster control plane missing (only node group role exists)
+3. `main.tf`: `eks` and `iam` modules not connected
+4. `output.tf` and `varables.tf` in root are empty
+5. ECR module not written yet (needed for Jenkins pipeline)
+
+**Still to write:**
+- ECR module
+- Root `variables.tf` and `outputs.tf`
+- Wire all modules in `main.tf` (pass VPC outputs → EKS, IAM ARNs → EKS)
+- Optional: S3 + DynamoDB backend for remote state
 
 ## Architecture
 

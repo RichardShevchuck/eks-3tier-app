@@ -8,7 +8,6 @@ variable "cluster_name" {
 variable "role_arn" {
   description = "ARN of the IAM role for the EKS cluster"
   type        = string
-
 }
 
 
