@@ -52,8 +52,8 @@ jobs:
 
       - name: build docker images
         run: |
-          docker build -t frontend:latest -f ./frontend/Dockerfile .
-          docker build -t backend:latest -f ./backend/Dockerfile .
+          docker build -t frontend:latest -f ./frontend/Dockerfile ./frontend
+          docker build -t backend:latest -f ./backend/Dockerfile ./backend
           docker tag frontend:latest ${{ secrets.ECR_FRONTEND }}:${{ github.sha }}
           docker tag frontend:latest ${{ secrets.ECR_FRONTEND }}:latest
           docker tag backend:latest ${{ secrets.ECR_BACKEND }}:${{ github.sha }}
