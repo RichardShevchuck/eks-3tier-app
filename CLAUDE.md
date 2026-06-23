@@ -146,3 +146,14 @@ k8s/
   postgres/deployment.yaml, service.yaml, pvc.yaml
   config/configmap.yaml, secret.yaml
 ```
+
+## What's Left
+
+1. **K8s manifests** — write all manifests above (namespace → postgres → backend → frontend)
+2. **`deploy` job in workflow** — `aws eks update-kubeconfig` + `kubectl apply -f k8s/`
+3. **Merge `test/cicd-pipeline` → `main`** (already done partially — verify)
+4. **Security hardening** (post-K8s):
+   - ECR `IMMUTABLE` + scan-on-push
+   - GitHub OIDC instead of long-lived AWS keys
+   - VPC Flow Logs
+   - S3 + DynamoDB Terraform remote state backend

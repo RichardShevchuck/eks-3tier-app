@@ -26,22 +26,26 @@ yarn-debug.log*
 yarn-error.log*
 
 # Terraform
-terrafrom/.terraform/
-terrafrom/*.tfstate
-terrafrom/*.tfstate.backup
-terrafrom/*.tfstate.*.backup
-terrafrom/.terraform.tfstate.lock.info
-terrafrom/crash.log
-terrafrom/override.tf
-terrafrom/override.tf.json
-terrafrom/*_override.tf
-terrafrom/*_override.tf.json
-terrafrom/*.tfvars
-terrafrom/*.tfvars.json
-terrafrom/terrafrom.tfplan
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfstate.*.backup
+.terraform.tfstate.lock.info
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+*.tfvars
+*.tfvars.json
+terraform.tfstate
+terraform.tfstate.backup
 
 # Terraform modules subdirs
-terrafrom/modules/**/.terraform/
+**/modules/**/.terraform/
+
+# Terraform plan output
+*.tfplan
 
 # macOS
 .DS_Store

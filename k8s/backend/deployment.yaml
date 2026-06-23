@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+  namespace: eks-3tier-app
+  labels:
+    app: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      initContainers:
+        - name: migrate
+          image: 079975324514.dkr.ecr.eu-central-1.amazonaws.com/k8s-ecr-repository-backend:IMAGE_TAG
+          command: ["bash", "migrate.sh"]
+          envFrom:
+            - secretRef:
+                name: app-secret
+            - configMapRef:
+                name: k8s-configmap
+      containers:
+        - name: backend
+          image: 079975324514.dkr.ecr.eu-central-1.amazonaws.com/k8s-ecr-repository-backend:IMAGE_TAG
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: app-secret
+            - configMapRef:
+                name: k8s-configmap

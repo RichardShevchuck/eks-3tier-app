@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-deployment
+  namespace: eks-3tier-app
+  labels:
+    app: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: 079975324514.dkr.ecr.eu-central-1.amazonaws.com/k8s-ecr-repository-frontend:IMAGE_TAG
+          ports:
+            - containerPort: 80
+          envFrom:
+            - secretRef:
+                name: app-secret
+            - configMapRef:
+                name: k8s-configmap

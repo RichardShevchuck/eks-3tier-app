@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k8s-configmap
+  namespace: eks-3tier-app
+data:
+  POSTGRES_DB: flask_db
+  REACT_APP_API_URL: http://backend-service:8000/api
+  ALLOWED_ORIGINS: http://localhost:3000,http://frontend-service,http://frontend-service:80
