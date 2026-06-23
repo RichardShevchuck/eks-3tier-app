@@ -15,10 +15,17 @@ echo "Creating migrations..."
 flask db migrate -m "Auto-generated migration" 2>/dev/null || true
 
 echo "Applying migrations..."
-# Stamp base if revision mismatch (EBS persists old alembic_version across pod restarts)
+# If upgrade fails due to revision mismatch, drop alembic_version and retry
 if ! flask db upgrade 2>/dev/null; then
-    echo "Revision mismatch, stamping base and retrying..."
-    flask db stamp base
+    echo "Revision mismatch, clearing alembic_version and retrying..."
+    python -c "
+from sqlalchemy import create_engine, text
+import os
+engine = create_engine(os.environ['DATABASE_URL'])
+with engine.connect() as conn:
+    conn.execute(text('DROP TABLE IF EXISTS alembic_version'))
+    conn.commit()
+"
     flask db upgrade
 fi
 
