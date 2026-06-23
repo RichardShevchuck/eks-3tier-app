@@ -47,10 +47,10 @@ git push → GitHub Actions
 
 ## Infrastructure (Terraform)
 
-Directory: `terrafrom/` (note spelling). Region: `eu-central-1`.
+Directory: `terraform/`. Region: `eu-central-1`.
 
 ```bash
-cd terrafrom
+cd terraform
 terraform init
 terraform plan
 terraform apply

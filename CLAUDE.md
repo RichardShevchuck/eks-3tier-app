@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 DevOps quiz platform (Docker, Kubernetes, Jenkins, AWS, Linux topics). Three-tier: React frontend → Flask API → PostgreSQL. Deployed on AWS EKS via Terraform. CI/CD via GitHub Actions.
 
-Note: the Terraform directory is named `terrafrom` (typo), not `terraform`.
+Terraform directory: `terraform/`.
 
 ## Collaboration Style
 
@@ -18,10 +18,10 @@ Based on: https://github.com/NotHarshhaa/DevOps-Projects/tree/master/DevOps-Proj
 
 ## CI/CD
 
-**GitHub Actions** (`.github/workflows/deploy.yaml`). Three jobs:
+**GitHub Actions** (`.github/workflows/deploy.yaml`). Three jobs (all complete):
 1. `test` — Python pytest
-2. `build` — Docker build + push to ECR (tagged with `github.sha` and `latest`)
-3. `deploy` — kubectl apply (not yet written, pending K8s manifests)
+2. `build` — Docker build + push to ECR (tagged with `github.sha` and `latest`). `needs: test`.
+3. `deploy` — `aws eks update-kubeconfig`, replaces `IMAGE_TAG` placeholder in manifests with `github.sha`, `kubectl apply -f k8s/ --recursive`. `needs: build`.
 
 Required GitHub repository secrets:
 - `AWS_ACCESS_KEY_ID`
@@ -84,7 +84,7 @@ npm test -- --watchAll=false
 ## Terraform (Infrastructure)
 
 ```bash
-cd terrafrom   # note spelling
+cd terraform
 terraform init
 terraform plan
 terraform apply
@@ -135,24 +135,28 @@ Production build served by nginx (`frontend/nginx.conf`).
 
 Docker build context must be `./frontend` (not repo root) — `nginx.conf` is relative to service dir.
 
-### K8s (`k8s/`) — not yet written
+### K8s (`k8s/`) — complete
 
-Planned structure:
 ```
 k8s/
-  namespace.yaml
-  backend/deployment.yaml, service.yaml
-  frontend/deployment.yaml, service.yaml
-  postgres/deployment.yaml, service.yaml, pvc.yaml
-  config/configmap.yaml, secret.yaml
+  namespace.yml
+  config/configmap.yaml        # POSTGRES_DB, REACT_APP_API_URL, ALLOWED_ORIGINS
+  config/secret.yaml           # POSTGRES_USER, POSTGRES_PASSWORD, DATABASE_URL
+  postgres/pvc.yaml            # EBS gp2 1Gi
+  postgres/service.yaml        # ClusterIP :5432
+  postgres/deployment.yaml     # postgres:13, envFrom both secret+configmap, volumeMount
+  backend/service.yaml         # ClusterIP :8000
+  backend/deployment.yaml      # Flask 2 replicas, initContainer runs migrate.sh, IMAGE_TAG placeholder
+  frontend/service.yaml        # LoadBalancer :80 (creates AWS CLB)
+  frontend/deployment.yaml     # React+nginx 2 replicas, IMAGE_TAG placeholder
 ```
+
+`IMAGE_TAG` in backend and frontend deployments is replaced at deploy time by GitHub Actions with `github.sha`.
 
 ## What's Left
 
-1. **K8s manifests** — write all manifests above (namespace → postgres → backend → frontend)
-2. **`deploy` job in workflow** — `aws eks update-kubeconfig` + `kubectl apply -f k8s/`
-3. **Merge `test/cicd-pipeline` → `main`** (already done partially — verify)
-4. **Security hardening** (post-K8s):
+1. **`terraform apply`** — spin up EKS cluster before deploying
+2. **Security hardening**:
    - ECR `IMMUTABLE` + scan-on-push
    - GitHub OIDC instead of long-lived AWS keys
    - VPC Flow Logs
