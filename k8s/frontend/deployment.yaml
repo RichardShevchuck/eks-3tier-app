@@ -25,3 +25,13 @@ spec:
                 name: app-secret
             - configMapRef:
                 name: k8s-configmap
+          securityContext:
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi

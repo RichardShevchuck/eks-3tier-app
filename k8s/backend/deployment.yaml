@@ -24,6 +24,10 @@ spec:
                 name: app-secret
             - configMapRef:
                 name: k8s-configmap
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
       containers:
         - name: backend
           image: 079975324514.dkr.ecr.eu-central-1.amazonaws.com/k8s-ecr-repository-backend:IMAGE_TAG
@@ -34,3 +38,14 @@ spec:
                 name: app-secret
             - configMapRef:
                 name: k8s-configmap
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

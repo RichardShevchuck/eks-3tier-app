@@ -25,6 +25,17 @@ spec:
                 name: app-secret
             - configMapRef:
                 name: k8s-configmap
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            allowPrivilegeEscalation: false
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
           volumeMounts:
             - name: postgres-storage
               mountPath: /var/lib/postgresql/data
